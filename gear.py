@@ -252,12 +252,12 @@ if __name__ == "__main__":
         step_1()
         print ""
 
-        step_2("/Users/pwnux90/MEGA/workplace/gearbubble/source/img/spod-1.png", "0", "b", 30)
+        step_2("D:\\workspace\\gearbubble\\img\\spod-1.png", "1", "b", 30)
         print ""
 
-        os.system("pkill geckodriver")
+        os.system("kill geckodriver")
         print "[+] geckodriver killed."
 
     except Exception:
-        os.system("pkill geckodriver")
+        os.system("kill geckodriver")
         print "[+] geckodriver killed."
