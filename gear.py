@@ -4,7 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import *
-from PIL import Image
+from PIL import Image, ImageChops
 import os, sys, openpyxl, time, datetime, getopt
 
 
@@ -127,7 +127,7 @@ def step_1():
 
     except TimeoutException:
         print "[-] timeout happended."
-        fail_log.write(str(datetime.datetime.now()) + " " + "timeout exception \n")
+        # fail_log.write(str(datetime.datetime.now()) + " " + "timeout exception \n")
 
 
 def step_2(__upload_link__, __wrapped__, __base_cost__):
@@ -228,7 +228,21 @@ def step_2(__upload_link__, __wrapped__, __base_cost__):
     # --------------------------------------------------------------
 
 
-def wrap(__path__, __filename__, __x_offset__, __y_offset__, __file_width__):
+def trim(image):
+    image_size = image.size
+    # image_box = image.getbbox()
+
+    image_components = image.split()
+
+    rgb_image = Image.new("RGB", image_size, (0, 0, 0))
+    rgb_image.paste(image, mask=image_components[3])
+    cropped_box = rgb_image.getbbox()
+
+    cropped = image.crop(cropped_box)
+    return cropped
+
+
+def wrap(__path__, __filename__, __x_center__, __y_center__, max_width, max_height):
     # Check slash at the end of file
     if __path__[len(__path__) - 1] != "/":
         new_path = __path__ + "/"
@@ -241,6 +255,9 @@ def wrap(__path__, __filename__, __x_offset__, __y_offset__, __file_width__):
 
     background_mug = Image.open("background_mug.png")
     real_instance = Image.open(new_path + __filename__)
+
+    # Trim png
+    real_instance = trim(real_instance)
 
     instance_size = real_instance.size
     instance_width = instance_size[0]
@@ -260,20 +277,26 @@ def wrap(__path__, __filename__, __x_offset__, __y_offset__, __file_width__):
     print "[+] Width: " + str(background_width)
     print "[+] Height: " + str(background_height)
 
-    instance_ratio = instance_height / instance_width
-    new_instance_width = __file_width__
-    new_instance_height = __file_width__ * instance_ratio
-    for i in xrange(sys.maxint):
-        if new_instance_height > 830:
-            new_instance_width -= 10
-            new_instance_height = new_instance_width * instance_ratio
-        if new_instance_height <= 830:
-            break
+    instance_ratio = instance_height / (instance_width * 1.0)
+
+    if instance_ratio < (max_height / (max_width * 1.0)):
+        new_instance_width = max_width
+        new_instance_height = new_instance_width * instance_ratio
+    else:
+        new_instance_height = max_height
+        new_instance_width = new_instance_height / instance_ratio
+
+    # for i in xrange(sys.maxint):
+    #     if new_instance_height > 830:
+    #         new_instance_width -= 10
+    #         new_instance_height = new_instance_width * instance_ratio
+    #     if new_instance_height <= 830:
+    #         break
 
     # combine two image
-    x_offset = __x_offset__
-    y_offset = __y_offset__
-    paste_instance = real_instance.resize((new_instance_width, new_instance_height))
+    x_offset = int(__x_center__ - new_instance_width / 2)
+    y_offset = int(__y_center__ - new_instance_height / 2)
+    paste_instance = real_instance.resize((int(new_instance_width), int(new_instance_height)))
 
     new_image = Image.new('RGBA', (background_width, background_height))
     new_image.paste(paste_instance, (x_offset, y_offset))
@@ -422,7 +445,7 @@ def step_4(__file_name__):
     )
 
     # Logging successfull product to file
-    success_log.write(str(datetime.datetime.now()) + " " + __file_name__ + "\n")
+    # success_log.write(str(datetime.datetime.now()) + " " + __file_name__ + "\n")
     print "[+] Uploading finished."
 
 
@@ -446,39 +469,33 @@ def main(argv):
     # Getting file in folder
     all_file = os.listdir(image_link)
 
-    try:
+    login()
+    print ""
 
-        login()
-        print ""
+    for item in all_file:
+        if "png" in item:
+            step_1()
+            print ""
 
-        for item in all_file:
-            if "png" in item:
+            # wrap(__path__, __filename__, __x_center__, __y_center__, max_width, max_height)
+            new_wrap_image = wrap(image_link, item, 450, 500, 700, 830)
+            step_2(new_wrap_image, "1", 9.95)
+            print ""
 
-                step_1()
-                print ""
+            split_name = item.split(".")[0]
+            title_url = gb_title_validate(split_name)
 
-                new_wrap_image = wrap(image_link, item, 40, 300, 4500)
-                step_2(new_wrap_image, "1", 9.95)
-                print ""
+            url_element = WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.ID, "campaign_slug"))
+            )
+            print "[+] URL element founded."
+            product_url = gb_url_validate(split_name, url_element)
+            print "[+] URL validated."
 
-                split_name = item.split(".")[0]
-                title_url = gb_title_validate(split_name)
+            step_3(title_url, product_url, 0)
 
-                url_element = WebDriverWait(driver, 60).until(
-                    EC.presence_of_element_located((By.ID, "campaign_slug"))
-                )
-                print "[+] URL element founded."
-                product_url = gb_url_validate(split_name, url_element)
-                print "[+] URL validated."
-
-                step_3(title_url, product_url, 0)
-
-                # Step 4: report and logging
-                step_4(item)
-
-    except Exception:
-        os.system("pkill geckodriver")
-        print "[+] geckodriver killed."
+            # Step 4: report and logging
+            step_4(item)
 
 
 if __name__ == "__main__":
