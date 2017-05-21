@@ -125,7 +125,7 @@ def step_1():
         fail_log.write(str(datetime.datetime.now()) + " " + "timeout exception \n")
 
 
-def step_2(__upload_link__, __wrapped__, __color__, __base_cost__):
+def step_2(__upload_link__, __wrapped__, __base_cost__):
     # CHECKING STEP 2 STATUS
     checkbox = WebDriverWait(driver, 60).until(
         EC.presence_of_all_elements_located((By.CLASS_NAME, "checkbox"))
@@ -196,27 +196,6 @@ def step_2(__upload_link__, __wrapped__, __color__, __base_cost__):
     #
     # --------------------------------------------------------------
 
-    # CONFIGURE COLOR
-    color_file = open(os.path.dirname(repr(sys.argv[0])).strip("\'") + "/config", "r")
-    color_data = color_file.readlines()
-    for elm_color_data in color_data:
-        if elm_color_data == "":
-            continue
-        else:
-            color_text = elm_color_data.split("=")[0]
-            color_value = elm_color_data.split("=")[1]
-            if __color__ == color_text:
-                color_section = WebDriverWait(driver, 30).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "colors-section"))
-                )
-                print "[+] color section found."
-                selective_colors = color_section.find_elements_by_class_name("js-color-item")
-                print "[+] color items found."
-                for elm_selective_color in selective_colors:
-                    data_id = elm_selective_color.get_attribute("data-id")
-                    if data_id == color_value:
-                        elm_selective_color.click()
-                        print "[+] color selected."
     #
     # --------------------------------------------------------------
 
@@ -236,8 +215,67 @@ def step_2(__upload_link__, __wrapped__, __color__, __base_cost__):
 
     # CLICKING TO NEXT STEP
     #
+    next_btn = driver.find_element_by_class_name("btn-success")
+    next_btn.click()
+    print "[+] Next step clicked."
+    print "----------------------"
+    #
     # --------------------------------------------------------------
 
+
+def wrap(__path__, __filename__, __x_offset__, __y_offset__, __file_width__):
+    # Check slash at the end of file
+    if __path__[len(__path__) - 1] != "/":
+        new_path = __path__ + "/"
+    else:
+        new_path = __path__
+
+    # Check wrapped_mug foler exist or not
+    if not os.path.isdir(new_path + "full_mugs"):
+        os.mkdir(new_path + "full_mugs")
+
+    background_mug = Image.open("background_mug.png")
+    real_instance = Image.open(new_path + __filename__)
+
+    instance_size = real_instance.size
+    instance_width = instance_size[0]
+    instance_height = instance_size[1]
+
+    background_size = background_mug.size
+    background_width = background_size[0]
+    background_height = background_size[1]
+
+    print "Instance"
+    print "----------------------------"
+    print "[+] Width: " + str(instance_width)
+    print "[+] Height: " + str(instance_height)
+
+    print "Background"
+    print "----------------------------"
+    print "[+] Width: " + str(background_width)
+    print "[+] Height: " + str(background_height)
+
+    instance_ratio = instance_height / instance_width
+    new_instance_width = __file_width__
+    new_instance_height = __file_width__ * instance_ratio
+    for i in xrange(sys.maxint):
+        if new_instance_height > 830:
+            new_instance_width -= 10
+            new_instance_height = new_instance_width * instance_ratio
+        if new_instance_height <= 830:
+            break
+
+    # combine two image
+    x_offset = __x_offset__
+    y_offset = __y_offset__
+    paste_instance = real_instance.resize((new_instance_width, new_instance_height))
+
+    new_image = Image.new('RGBA', (background_width, background_height))
+    new_image.paste(paste_instance, (x_offset, y_offset))
+    new_image_path_name = new_path + "full_mugs/wrapped_" + __filename__ + ".png"
+    new_image.save(new_image_path_name, 'PNG')
+
+    return new_image_path_name
 
 if __name__ == "__main__":
 
@@ -252,12 +290,13 @@ if __name__ == "__main__":
         step_1()
         print ""
 
-        step_2("D:\\workspace\\gearbubble\\img\\spod-1.png", "1", "b", 30)
+        # def step_2(__upload_link__, __wrapped__, __base_cost__):
+        step_2("D:\\workspace\\gearbubble\\img\\spod-1.png", "0", 30)
         print ""
 
-        os.system("kill geckodriver")
+        os.system("taskkill /im geckodriver.exe /f")
         print "[+] geckodriver killed."
 
     except Exception:
-        os.system("kill geckodriver")
+        os.system("taskkill /im geckodriver.exe /f")
         print "[+] geckodriver killed."
