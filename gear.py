@@ -5,7 +5,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import *
 from PIL import Image
-import os, sys, openpyxl, time, datetime
+import os, sys, openpyxl, time, datetime, getopt
+
+
+driver = webdriver.Firefox()
+driver.set_page_load_timeout(3000)
+driver.set_window_size(1366, 800)
 
 
 def login():
@@ -277,26 +282,205 @@ def wrap(__path__, __filename__, __x_offset__, __y_offset__, __file_width__):
 
     return new_image_path_name
 
-if __name__ == "__main__":
 
-    driver = webdriver.Firefox()
-    driver.set_window_size(1366, 800)
+# Check error url
+def gb_check_url_err():
+    url_err = driver.find_element_by_id("js-slug-error")
+    display_err = url_err.get_attribute("style")
+    return display_err
+
+
+# Validate url for fit requirement
+# No capital letter
+# No special letter like .
+def gb_url_validate(__title_name__, __element_url__):
+    print "==========================================="
+    print "[+] loading url validate"
+    useful_url = ""
+    special_character = u"~!@#$%ˆ&*()+=`:;/.,<>?|\\"
+    tmp_url = __title_name__.lower()
+    # Replace white space
+    tmp_url = tmp_url.replace(" ", "_")
+    # Replace special character
+    for elm in special_character:
+        if elm in tmp_url:
+            tmp_url = tmp_url.replace(elm, "_")
+
+    # print "[+] last modified url: " + tmp_url
+    # print "[+] type of url " + str(type(tmp_url))
+
+    tmp_url = tmp_url.replace(u"\u2019", "_")
+    tmp_url = tmp_url.replace(u"\u201D", "_")
+
+    print "[+] " + tmp_url
+    # sys.exit()
+    # note about single quote and double quote
+
+    base_len_url = len(__title_name__)
+    # Checking length
+    for i in xrange(sys.maxint):
+        if len(tmp_url) < 28:
+            __element_url__.clear()
+            __element_url__.send_keys(tmp_url)
+            err = gb_check_url_err()
+            if "block" in err:
+                # Adding number to the last
+                # Clear url first
+                tmp_url = tmp_url[:base_len_url]
+                tmp_url = tmp_url + str(i)
+            else:
+                break
+        else:
+            # Cutting to 28 and re-check
+            tmp_url = tmp_url[:28]
+            __element_url__.clear()
+            __element_url__.send_keys(tmp_url)
+            err = gb_check_url_err()
+            if "block" in err:
+                tmp_url = tmp_url[:25]
+                # Adding number to the last
+                tmp_url = tmp_url + str(i)
+            else:
+                break
+
+    useful_url = tmp_url
+    return useful_url
+
+
+# Validate title for fit requirement (not more 40 characters)
+def gb_title_validate(__raw_title__):
+    useful_title = ""
+
+    # Checking length 40 (for raw), but we just need 30
+    if len(__raw_title__) > 40:
+        useful_title = __raw_title__[:40]
+    else:
+        useful_title = __raw_title__
+
+    return useful_title
+
+
+def step_3(__title__, __url__, __back_default__):
+    for i in xrange(sys.maxint):
+        freeze_pattern = driver.find_element_by_class_name("freeze-section")
+        freeze_pattern_class = freeze_pattern.get_attribute("class")
+        if "hide" in freeze_pattern_class:
+            print ""
+            break
+        else:
+            wait_str = "[+] Waiting: " + str(i + 1)
+            sys.stdout.write("\r" + wait_str)
+            sys.stdout.flush()
+            time.sleep(1)
+
+    # Checking step #3 loading status
+    WebDriverWait(driver, 120).until(
+        EC.presence_of_element_located((By.CLASS_NAME, "js-btn-flip"))
+    )
+    print "[+] Step #3 loaded."
+
+    # Campaign title
+    campaign_title = driver.find_element_by_id("campaign_title")
+    campaign_title.send_keys(__title__)
+    print "[+] Campaign title filled."
+
+    # Campaign url
+    campaign_url = WebDriverWait(driver, 60).until(
+        EC.presence_of_element_located((By.ID, "campaign_slug"))
+    )
+    campaign_url.clear()
+    campaign_url.send_keys(__url__)
+    print "[+] Campaign url filled."
+
+    # Back default checking
+    if int(__back_default__) == 1:
+        driver.execute_script("document.getElementById('campaign_default_side').click();")
+        print "[+] Back default is set."
+
+    # Campaign term
+    driver.execute_script("document.getElementById('campaign_agreement').click();")
+    print "[+] Term and conditions agreed."
+
+    for i in range(5):
+        wait_str = "[+] Waiting: " + str(i + 1)
+        sys.stdout.write("\r" + wait_str)
+        sys.stdout.flush()
+        time.sleep(1)
+    print ""
+    # Next to step
+    # next_btn = driver.find_element_by_id("btn-add-description")
+    # next_btn.click()
+    driver.execute_script("document.getElementById('btn-add-description').click();")
+    print "[+] Next step clicked."
+    print "----------------------"
+
+
+def step_4(__file_name__):
+    # Checking step #4 loading status
+    WebDriverWait(driver, 120).until(
+        EC.presence_of_element_located((By.CLASS_NAME, "alert-success"))
+    )
+
+    # Logging successfull product to file
+    success_log.write(str(datetime.datetime.now()) + " " + __file_name__ + "\n")
+    print "[+] Uploading finished."
+
+
+def main(argv):
+
+    image_link = ""
+
+    try:
+        opts, args = getopt.getopt(argv, "hn:l:", ["name=", "link="])
+    except getopt.GetoptError:
+        print "[-] Error"
+        sys.exit(2)
+
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            print "Usage: python gear.py [-n] [-l]"
+            sys.exit()
+        if opt in ("-l", "--link="):
+            image_link = arg
+
+    # Getting file in folder
+    all_file = os.listdir(image_link)
 
     try:
 
         login()
         print ""
 
-        step_1()
-        print ""
+        for item in all_file:
+            if "png" in item:
 
-        # def step_2(__upload_link__, __wrapped__, __base_cost__):
-        step_2("D:\\workspace\\gearbubble\\img\\spod-1.png", "0", 30)
-        print ""
+                step_1()
+                print ""
 
-        os.system("taskkill /im geckodriver.exe /f")
-        print "[+] geckodriver killed."
+                new_wrap_image = wrap(image_link, item, 40, 300, 4500)
+                step_2(new_wrap_image, "1", 9.95)
+                print ""
+
+                split_name = item.split(".")[0]
+                title_url = gb_title_validate(split_name)
+
+                url_element = WebDriverWait(driver, 60).until(
+                    EC.presence_of_element_located((By.ID, "campaign_slug"))
+                )
+                print "[+] URL element founded."
+                product_url = gb_url_validate(split_name, url_element)
+                print "[+] URL validated."
+
+                step_3(title_url, product_url, 0)
+
+                # Step 4: report and logging
+                step_4(item)
 
     except Exception:
-        os.system("taskkill /im geckodriver.exe /f")
+        os.system("pkill geckodriver")
         print "[+] geckodriver killed."
+
+
+if __name__ == "__main__":
+
+    main(sys.argv[1:])
